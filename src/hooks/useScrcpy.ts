@@ -73,6 +73,8 @@ export function useScrcpy() {
     });
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+    const [incomingCall, setIncomingCall] = useState<{ device: string; phoneNumber: string } | null>(null);
+    const [callActive, setCallActive] = useState(false);
     // Removed mdnsDevices state
     const [theme, setTheme] = useState("ultraviolet");
     const [colorMode, setColorModeState] = useState<'light' | 'dark' | 'system'>(() => {
@@ -241,6 +243,33 @@ export function useScrcpy() {
             unlistenStatus.then(f => f());
         };
     }, [t]);
+
+    useEffect(() => {
+        const unlistenIncoming = listen<{ device: string; phoneNumber: string }>('android-incoming-call', (event) => {
+            setIncomingCall(event.payload);
+        });
+        const unlistenEnded = listen<any>('android-call-ended', () => {
+            setIncomingCall(null);
+            setCallActive(false);
+        });
+        const unlistenActive = listen<any>('android-call-active', () => {
+            setCallActive(true);
+        });
+        return () => {
+            unlistenIncoming.then(f => f());
+            unlistenEnded.then(f => f());
+            unlistenActive.then(f => f());
+        };
+    }, []);
+
+    // Auto-start/stop call monitor when active device changes
+    useEffect(() => {
+        if (!activeDevice) return;
+        invoke('start_call_monitor', { device: activeDevice, customPath: config.scrcpyPath }).catch(() => {});
+        return () => {
+            invoke('stop_call_monitor', { device: activeDevice }).catch(() => {});
+        };
+    }, [activeDevice, config.scrcpyPath]);
 
     const [historyDevices, setHistoryDevices] = useState<string[]>([]);
 
@@ -551,6 +580,32 @@ export function useScrcpy() {
         }
     };
 
+    const answerCall = async (device: string) => {
+        try {
+            await invoke('answer_call', { device, customPath: config.scrcpyPath });
+            setIncomingCall(null);
+            setCallActive(true);
+            setLogs(prev => [...prev.slice(-100), `[CALL] Call answered on ${device}`]);
+            // Start audio-only scrcpy stream if no session is already running
+            if (!runningDevices.includes(device)) {
+                await invoke('start_audio_stream', { device, customPath: config.scrcpyPath });
+                setLogs(prev => [...prev.slice(-100), '[CALL] Audio stream started for call']);
+            }
+        } catch (e) {
+            setLogs(prev => [...prev.slice(-100), `[ERROR] Failed to answer call: ${String(e)}`]);
+        }
+    };
+
+    const rejectCall = async (device: string) => {
+        try {
+            await invoke('reject_call', { device, customPath: config.scrcpyPath });
+            setIncomingCall(null);
+            setLogs(prev => [...prev.slice(-100), `[CALL] Call rejected on ${device}`]);
+        } catch (e) {
+            setLogs(prev => [...prev.slice(-100), `[ERROR] Failed to reject call: ${String(e)}`]);
+        }
+    };
+
     const clearLogs = () => setLogs([]);
 
     return {
@@ -596,6 +651,11 @@ export function useScrcpy() {
         completeOnboarding: () => {
             localStorage.setItem('scrcpy_onboarding_done', 'true');
             setIsOnboardingOpen(false);
-        }
+        },
+        incomingCall,
+        setIncomingCall,
+        callActive,
+        answerCall,
+        rejectCall,
     };
 }

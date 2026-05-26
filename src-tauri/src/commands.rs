@@ -6,7 +6,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use serde_json::json;
-use crate::ScrcpyState;
+use crate::{ScrcpyState, CallMonitorState};
 use tokio::process::Command as TokioCommand;
 use tokio::io::{BufReader, AsyncBufReadExt};
 use tokio::time::{timeout, Duration};
@@ -1125,6 +1125,217 @@ pub async fn run_scrcpy(window: Window, state: State<'_, ScrcpyState>, config: S
                         break;
                     }
                 }
+            }
+        }
+    });
+
+    Ok(())
+}
+
+// ── Call monitoring helpers ────────────────────────────────────────────────
+
+fn parse_call_state_from_dumpsys(text: &str) -> i32 {
+    // If any SIM is RINGING or OFFHOOK, report that state.
+    let mut first_idle: Option<i32> = None;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("mCallState=") {
+            if let Ok(s) = rest.trim().parse::<i32>() {
+                if s > 0 {
+                    return s;
+                }
+                if first_idle.is_none() {
+                    first_idle = Some(s);
+                }
+            }
+        }
+    }
+    first_idle.unwrap_or(-1)
+}
+
+fn parse_incoming_number_from_dumpsys(text: &str) -> String {
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("mCallIncomingNumber=") {
+            let num = rest.trim().trim_matches('"');
+            if !num.is_empty() && num != "null" {
+                return num.to_string();
+            }
+        }
+    }
+    String::new()
+}
+
+// ── Call monitoring commands ───────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn start_call_monitor(
+    device: String,
+    custom_path: Option<String>,
+    app_handle: tauri::AppHandle,
+    call_state: State<'_, CallMonitorState>,
+) -> Result<(), String> {
+    // Abort any existing monitor for this device
+    {
+        let mut handles = call_state.handles.lock().unwrap();
+        if let Some(old) = handles.remove(&device) {
+            old.abort();
+        }
+    }
+
+    let adb_path = get_binary_path("adb", custom_path);
+    let device_clone = device.clone();
+    let app_clone = app_handle.clone();
+
+    let join_handle = tokio::spawn(async move {
+        let mut last_state: i32 = -1;
+
+        loop {
+            let output = create_command(&adb_path)
+                .arg("-s")
+                .arg(&device_clone)
+                .arg("shell")
+                .arg("dumpsys telephony.registry")
+                .output()
+                .await;
+
+            if let Ok(o) = output {
+                let text = String::from_utf8_lossy(&o.stdout).to_string();
+                let call_state = parse_call_state_from_dumpsys(&text);
+
+                if call_state >= 0 && call_state != last_state {
+                    last_state = call_state;
+                    match call_state {
+                        1 => {
+                            let number = parse_incoming_number_from_dumpsys(&text);
+                            let _ = app_clone.emit("android-incoming-call", json!({
+                                "device": &device_clone,
+                                "phoneNumber": number
+                            }));
+                        }
+                        2 => {
+                            let _ = app_clone.emit("android-call-active", json!({
+                                "device": &device_clone
+                            }));
+                        }
+                        0 => {
+                            let _ = app_clone.emit("android-call-ended", json!({
+                                "device": &device_clone
+                            }));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            tokio::time::sleep(Duration::from_millis(1500)).await;
+        }
+    });
+
+    call_state.handles.lock().unwrap().insert(device, join_handle);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn stop_call_monitor(
+    device: String,
+    call_state: State<'_, CallMonitorState>,
+) -> Result<(), String> {
+    let mut handles = call_state.handles.lock().unwrap();
+    if let Some(handle) = handles.remove(&device) {
+        handle.abort();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn answer_call(
+    device: String,
+    custom_path: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let adb_path = get_binary_path("adb", custom_path);
+    let output = create_command(&adb_path)
+        .arg("-s").arg(&device)
+        .arg("shell")
+        .arg("input keyevent 5")
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(json!({ "success": output.status.success() }))
+}
+
+#[tauri::command]
+pub async fn reject_call(
+    device: String,
+    custom_path: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let adb_path = get_binary_path("adb", custom_path);
+    let output = create_command(&adb_path)
+        .arg("-s").arg(&device)
+        .arg("shell")
+        .arg("input keyevent 6")
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(json!({ "success": output.status.success() }))
+}
+
+/// Start an audio-only scrcpy session for call audio mirroring.
+/// Only starts if no session is already running for this device.
+#[tauri::command]
+pub async fn start_audio_stream(
+    window: Window,
+    state: State<'_, ScrcpyState>,
+    device: String,
+    custom_path: Option<String>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    if state.processes.lock().unwrap().contains_key(&device) {
+        return Ok(()); // session already running
+    }
+
+    let exe_path = get_binary_path("scrcpy", custom_path.clone());
+    let adb_exe_path = get_binary_path("adb", custom_path);
+    let server_path = if !exe_path.is_empty() && exe_path != "scrcpy" {
+        Path::new(&exe_path).parent().map(|p| p.join("scrcpy-server").to_string_lossy().to_string())
+    } else {
+        None
+    };
+
+    let args = vec![
+        "-s".to_string(),
+        device.clone(),
+        "--no-video".to_string(),
+    ];
+
+    let (child, _) = spawn_scrcpy_streams(
+        &window, &exe_path, &adb_exe_path, server_path.as_deref(), &args,
+    ).await?;
+
+    state.processes.lock().unwrap().insert(device.clone(), child);
+    let _ = window.emit("scrcpy-status", json!({ "device": &device, "running": true }));
+
+    let device_mon = device.clone();
+    let window_mon = window.clone();
+    let app_handle_mon = app_handle.clone();
+
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            let should_stop = {
+                let state_mon = app_handle_mon.state::<ScrcpyState>();
+                let mut processes = state_mon.processes.lock().unwrap();
+                match processes.get_mut(&device_mon) {
+                    Some(child) => match child.try_wait() {
+                        Ok(Some(_)) | Err(_) => { processes.remove(&device_mon); true }
+                        Ok(None) => false,
+                    },
+                    None => true,
+                }
+            };
+            if should_stop {
+                let _ = window_mon.emit("scrcpy-status", json!({ "device": &device_mon, "running": false }));
+                break;
             }
         }
     });

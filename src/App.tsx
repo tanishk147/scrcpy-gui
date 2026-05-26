@@ -11,6 +11,7 @@ import Footer from "./components/Footer";
 import ErrorBoundary from "./components/ErrorBoundary";
 import OnboardingModal from "./components/OnboardingModal";
 import ThemedModal from "./components/ThemedModal";
+import CallNotification from "./components/CallNotification";
 import { useScrcpy } from "./hooks/useScrcpy";
 import { getVersion } from '@tauri-apps/api/app';
 import { useI18n } from "./i18n";
@@ -55,7 +56,11 @@ function App() {
     clearHistory,
     isOnboardingOpen,
     setIsOnboardingOpen,
-    completeOnboarding
+    completeOnboarding,
+    incomingCall,
+    setIncomingCall,
+    answerCall,
+    rejectCall,
   } = useScrcpy();
 
   const [alertState, setAlertState] = useState<{
@@ -395,6 +400,16 @@ function App() {
           cancelLabel={alertState.cancelLabel}
           onCancel={alertState.onCancel}
         />
+
+        {incomingCall && (
+          <CallNotification
+            phoneNumber={incomingCall.phoneNumber}
+            device={incomingCall.device}
+            onAnswer={() => answerCall(incomingCall.device)}
+            onReject={() => rejectCall(incomingCall.device)}
+            onDismiss={() => setIncomingCall(null)}
+          />
+        )}
       </div>
     </ErrorBoundary>
   );

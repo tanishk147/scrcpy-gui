@@ -274,6 +274,14 @@ export const ru: Translations = {
     diagnosticSavedAlert: 'Диагностический отчёт сохранён в Загрузки как: {fileName}',
   },
 
+  callNotification: {
+    incomingCall: 'Входящий звонок',
+    unknown: 'Неизвестный абонент',
+    answer: 'Ответить',
+    decline: 'Отклонить',
+    callEnded: 'Звонок завершён',
+    audioStreamStarted: 'Аудиопоток звонка запущен'
+  },
   alerts: {
     noDeviceSelectedTitle: 'Устройство не выбрано',
     noDeviceSelectedMessage: 'Выберите устройство на боковой панели, чтобы продолжить.\nПодсказка: если вы только что подключили телефон, нажмите «Обновить» на боковой панели, чтобы обновить список.',

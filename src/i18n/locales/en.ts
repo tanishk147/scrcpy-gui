@@ -260,6 +260,14 @@ export const en = {
         recoveryEngine: 'Antigravity Recovery Engine v1.0',
         diagnosticSavedAlert: 'Diagnostic report saved to Downloads as: {fileName}'
     },
+    callNotification: {
+        incomingCall: 'Incoming Call',
+        unknown: 'Unknown Caller',
+        answer: 'Answer',
+        decline: 'Decline',
+        callEnded: 'Call Ended',
+        audioStreamStarted: 'Audio stream started for call'
+    },
     alerts: {
         noDeviceSelectedTitle: 'No Device Selected',
         noDeviceSelectedMessage: "Please select a device from the sidebar to continue. Hint: If you just connected your phone, click 'Refresh' in the sidebar to update the list.",
