@@ -259,6 +259,14 @@ export const ptBR: Translations = {
         recoveryEngine: 'Motor de Recuperação Antigravity v1.0',
         diagnosticSavedAlert: 'Relatório de diagnóstico salvo em Downloads como: {fileName}'
     },
+    callNotification: {
+        incomingCall: 'Chamada recebida',
+        unknown: 'Chamador desconhecido',
+        answer: 'Atender',
+        decline: 'Recusar',
+        callEnded: 'Chamada encerrada',
+        audioStreamStarted: 'Transmissão de áudio iniciada para chamada'
+    },
     alerts: {
         noDeviceSelectedTitle: 'Nenhum Dispositivo Selecionado',
         noDeviceSelectedMessage: 'Selecione um dispositivo na barra lateral para continuar. Dica: se você acabou de conectar seu telefone, clique em "Atualizar" na barra lateral para atualizar a lista.',

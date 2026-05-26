@@ -262,6 +262,14 @@ export const zhCN: Translations = {
         recoveryEngine: '反重力恢复引擎 v1.0',
         diagnosticSavedAlert: '诊断报告已保存到“下载”文件夹：{fileName}'
     },
+    callNotification: {
+        incomingCall: '来电',
+        unknown: '未知来电',
+        answer: '接听',
+        decline: '拒绝',
+        callEnded: '通话结束',
+        audioStreamStarted: '通话音频流已启动'
+    },
     alerts: {
         noDeviceSelectedTitle: '未选择设备',
         noDeviceSelectedMessage: '请先从侧边栏选择一个设备再继续。提示：如果你刚接入手机，请点击侧边栏中的“刷新”以更新列表。',

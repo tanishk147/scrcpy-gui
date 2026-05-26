@@ -3,12 +3,17 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::Manager;
 use tokio::process::Child;
+use tokio::task::JoinHandle;
 
 #[cfg(target_os = "linux")]
 use std::os::unix::process::CommandExt;
 
 pub struct ScrcpyState {
     pub processes: Mutex<HashMap<String, Child>>,
+}
+
+pub struct CallMonitorState {
+    pub handles: Mutex<HashMap<String, JoinHandle<()>>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -62,6 +67,9 @@ pub fn run() {
             app.manage(ScrcpyState {
                 processes: Mutex::new(HashMap::new()),
             });
+            app.manage(CallMonitorState {
+                handles: Mutex::new(HashMap::new()),
+            });
 
             // Show splashscreen instantly
             if let Some(splash_window) = app.get_webview_window("splashscreen") {
@@ -91,6 +99,11 @@ pub fn run() {
             commands::get_scrcpy_bin_dir,
             commands::run_terminal_command,
             commands::check_scrcpy_update,
+            commands::start_call_monitor,
+            commands::stop_call_monitor,
+            commands::answer_call,
+            commands::reject_call,
+            commands::start_audio_stream,
             close_splashscreen,
             get_app_version
         ])

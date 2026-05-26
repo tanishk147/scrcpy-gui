@@ -259,6 +259,14 @@ export const fr: Translations = {
         recoveryEngine: 'Moteur de Récupération Antigravity v1.0',
         diagnosticSavedAlert: 'Rapport de diagnostic enregistré dans Téléchargements sous : {fileName}'
     },
+    callNotification: {
+        incomingCall: 'Appel entrant',
+        unknown: 'Appelant inconnu',
+        answer: 'Répondre',
+        decline: 'Refuser',
+        callEnded: 'Appel terminé',
+        audioStreamStarted: 'Flux audio démarré pour l\'appel'
+    },
     alerts: {
         noDeviceSelectedTitle: 'Aucun Appareil Sélectionné',
         noDeviceSelectedMessage: "Veuillez sélectionner un appareil dans la barre latérale pour continuer. Astuce : si vous venez de connecter votre téléphone, cliquez sur « Actualiser » dans la barre latérale pour mettre à jour la liste.",

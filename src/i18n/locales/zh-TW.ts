@@ -259,6 +259,14 @@ export const zhTW: Translations = {
         recoveryEngine: '反重力修復引擎 v1.0',
         diagnosticSavedAlert: '診斷報告已儲存至「下載」資料夾，檔案名稱為：{fileName}'
     },
+    callNotification: {
+        incomingCall: '來電',
+        unknown: '未知來電',
+        answer: '接聽',
+        decline: '拒絕',
+        callEnded: '通話結束',
+        audioStreamStarted: '通話音訊串流已啟動'
+    },
     alerts: {
         noDeviceSelectedTitle: '未選擇裝置',
         noDeviceSelectedMessage: "請從側邊栏選擇一個裝置以繼續。提示：如果您剛連接手機，請點擊側邊栏的「重新整理」以更新清單。",
